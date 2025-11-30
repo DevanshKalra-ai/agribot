@@ -452,8 +452,9 @@
             else if (audioBlob.type.includes('ogg')) extension = 'ogg';
             else if (audioBlob.type.includes('wav')) extension = 'wav';
             
-            // STATIC FILENAME: "audio_message"
-            formData.append('file', audioBlob, `audio_message.${extension}`);
+            // STATIC FILENAME: "audio_message" with timestamp to avoid collision
+            const timestamp = new Date().getTime();
+            formData.append('file', audioBlob, `audio_message_${timestamp}.${extension}`);
 
             try {
                 const response = await fetch(AUDIO_WEBHOOK_URL, {
