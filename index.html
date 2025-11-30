@@ -178,8 +178,16 @@
     <script>
         // --- CONFIGURATION ---
         const CHAT_WEBHOOK_URL = "https://devanshkalrad.app.n8n.cloud/webhook/6ace38a3-7145-4c3a-b230-007b16dc998d/chat";
-        // UPDATED: Production URL
         const AUDIO_WEBHOOK_URL = "https://devanshkalrad.app.n8n.cloud/webhook/audio-in";
+
+        // --- SESSION MANAGEMENT ---
+        // Generate or retrieve a persistent session ID
+        let sessionId = localStorage.getItem('chat_session_id');
+        if (!sessionId) {
+            sessionId = 'sess_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('chat_session_id', sessionId);
+        }
+        console.log("Current Session ID:", sessionId);
 
         // --- STATE ---
         let selectedImage = null;
@@ -318,9 +326,12 @@
 
             // 2. Prepare Data
             const formData = new FormData();
-            formData.append('chatInput', text); // Standard n8n chat input
+            formData.append('chatInput', text);
+            // SEND SESSION ID
+            formData.append('sessionId', sessionId);
+            
             if (selectedImage) {
-                formData.append('files', selectedImage, selectedImage.name); // Attach file
+                formData.append('files', selectedImage, selectedImage.name);
             }
 
             // 3. Clear Input
@@ -340,13 +351,11 @@
 
                 if (!response.ok) throw new Error('Network response was not ok');
 
-                // Try to parse JSON first, else text
                 const contentType = response.headers.get("content-type");
                 let botResponse;
 
                 if (contentType && contentType.includes("application/json")) {
                     const data = await response.json();
-                    // n8n output usually in 'output' or 'text' or just the object
                     botResponse = data.output || data.text || data.message || JSON.stringify(data);
                 } else {
                     botResponse = await response.text();
@@ -368,7 +377,6 @@
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 
-                // Smart mimeType detection for Safari vs Chrome compatibility
                 let options = {};
                 if (MediaRecorder.isTypeSupported('audio/webm')) {
                     options = { mimeType: 'audio/webm' };
@@ -378,7 +386,6 @@
                     options = { mimeType: 'audio/ogg' };
                 }
                 
-                // If no options set, browser uses default (which is usually safe but we check later)
                 mediaRecorder = new MediaRecorder(stream, options);
                 audioChunks = [];
 
@@ -387,12 +394,10 @@
                 };
 
                 mediaRecorder.onstop = () => {
-                    // Use the actual mime type determined by the browser/recorder
                     const mimeType = mediaRecorder.mimeType || 'audio/webm';
                     const blob = new Blob(audioChunks, { type: mimeType });
                     sendAudioMessage(blob);
                     
-                    // Stop tracks
                     stream.getTracks().forEach(track => track.stop());
                     if(audioContext) audioContext.close();
                 };
@@ -425,12 +430,9 @@
 
         function cancelRecording() {
             if (mediaRecorder && isRecording) {
-                // Stop but don't send (overwrite onstop temporarily)
-                mediaRecorder.onstop = null;
                 mediaRecorder.stop();
                 isRecording = false;
                 
-                // Cleanup
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 if(audioContext) audioContext.close();
                 cancelAnimationFrame(animationId);
@@ -442,21 +444,21 @@
         }
 
         async function sendAudioMessage(audioBlob) {
-            // 1. Show user audio bubble
             appendMessage('user', '', null, true);
             loadingIndicator.classList.remove('hidden');
             scrollToBottom();
 
-            // 2. Prepare Form Data with correct extension
             const formData = new FormData();
             
-            // Determine extension based on blob type
             let extension = 'webm';
             if (audioBlob.type.includes('mp4')) extension = 'mp4';
             else if (audioBlob.type.includes('ogg')) extension = 'ogg';
             else if (audioBlob.type.includes('wav')) extension = 'wav';
             
             formData.append('file', audioBlob, `voice_message.${extension}`);
+            
+            // SEND SESSION ID
+            formData.append('sessionId', sessionId);
 
             try {
                 const response = await fetch(AUDIO_WEBHOOK_URL, {
@@ -468,15 +470,26 @@
                     throw new Error(`Server returned ${response.status} ${response.statusText}`);
                 }
 
-                // Handle Response (Assume text back from audio processing)
                 const contentType = response.headers.get("content-type");
                 let botResponse;
 
                 if (contentType && contentType.includes("application/json")) {
                     const data = await response.json();
-                    botResponse = data.output || data.text || JSON.stringify(data);
+                    
+                    const rawText = data.output || data.text || data.message || data.content;
+                    
+                    if (rawText) {
+                        botResponse = rawText;
+                    } else {
+                        console.warn("Received empty JSON response:", data);
+                        botResponse = "⚠️ The AI processed the audio but returned an empty response. Please check your n8n mappings.";
+                    }
                 } else {
                     botResponse = await response.text();
+                }
+
+                if (!botResponse || botResponse.trim() === "") {
+                     botResponse = "⚠️ Received an empty response from the server.";
                 }
 
                 loadingIndicator.classList.add('hidden');
