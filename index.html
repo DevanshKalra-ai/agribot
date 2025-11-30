@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriBot | Smart Farming Assistant</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
+    
+    <link rel="stylesheet" href="style.css"> 
+</head>
+<body>
+
+    <div class="header">
+        <h1>🌱 AgriBot</h1>
+        <p>Your AI Assistant for Crop & Weather Advice</p>
+    </div>
+
+    <div id="n8n-chat"></div>
+
+    <script type="module">
+        import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
+
+        createChat({
+            webhookUrl: 'PASTE_YOUR_WEBHOOK_URL_HERE', 
+            target: '#n8n-chat',
+            mode: 'fullscreen', 
+            showWelcomeScreen: true, 
+            initialMessages: [
+                'Namaste! I am AgriBot. 🌾',
+                'Ask me about weather, crop diseases, or market prices.'
+            ],
+            i18n: {
+                en: {
+                    title: 'AgriBot Chat',
+                    subtitle: 'Powered by AI'
+                }
+            },
+            // Set internal colors to transparent so style.css takes over
+            style: {
+                '--chat---color-primary': 'transparent',
+                '--chat---color-secondary': 'transparent',
+                '--chat---color-background': 'transparent'
+            }
+        });
+    </script>
+</body>
+</html>

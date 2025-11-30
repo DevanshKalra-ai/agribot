@@ -1,0 +1,114 @@
+/* style.css - The Liquid Glass Theme */
+
+/* --- 1. Background & Layout --- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    /* Vibrant green gradient background */
+    background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Moving background blobs for refraction */
+body::before, body::after {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    z-index: -1;
+    filter: blur(80px);
+    opacity: 0.6;
+    animation: float 10s infinite ease-in-out;
+}
+body::before { background: #fceabb; top: 5%; left: 10%; animation-delay: 0s; }
+body::after { background: #f8b500; bottom: 10%; right: 10%; animation-delay: -5s; }
+
+@keyframes float {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(30px, -30px); }
+}
+
+/* --- 2. Header --- */
+.header {
+    text-align: center;
+    margin-bottom: 25px;
+    color: #064e3b;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.4);
+    z-index: 10;
+}
+.header h1 { font-size: 3rem; font-weight: 800; letter-spacing: -1px; }
+.header p { font-size: 1.2rem; font-weight: 500; }
+
+/* --- 3. The Main Glass Container --- */
+#n8n-chat {
+    width: 100%;
+    max-width: 850px;
+    height: 75vh;
+    background: rgba(255, 255, 255, 0.2); /* Low opacity for transparency */
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 30px;
+    box-shadow: 
+        0 20px 50px -10px rgba(0,0,0,0.15),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+    overflow: hidden;
+    position: relative;
+    z-index: 10;
+}
+
+/* --- 4. N8N WIDGET OVERRIDES --- */
+/* These specific classes target the n8n widget internals */
+
+.chat-layout, .chat-list {
+    background: transparent !important;
+}
+
+/* User Message (Right Side) - Green Glass */
+.chat-message-right {
+    background: rgba(5, 150, 105, 0.25) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 
+        0 4px 15px rgba(0,0,0,0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+    color: #022c22 !important;
+    border-radius: 20px 20px 4px 20px !important;
+}
+
+/* Bot Message (Left Side) - White Glass */
+.chat-message-left {
+    background: rgba(255, 255, 255, 0.4) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    box-shadow: 
+        0 4px 15px rgba(0,0,0,0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+    color: #111 !important;
+    border-radius: 20px 20px 20px 4px !important;
+}
+
+/* Input Area - Glass Bar */
+.chat-footer {
+    background: rgba(255, 255, 255, 0.3) !important;
+    backdrop-filter: blur(15px) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
+}
+
+.chat-input {
+    background: rgba(255, 255, 255, 0.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    border-radius: 99px !important;
+    color: #333 !important;
+}
