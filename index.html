@@ -25,10 +25,14 @@
             webhookUrl: 'https://devanshkalrad.app.n8n.cloud/webhook/6ace38a3-7145-4c3a-b230-007b16dc998d/chat', 
             target: '#n8n-chat',
             mode: 'fullscreen', 
-            showWelcomeScreen: true, 
+            showWelcomeScreen: true,
+            allowFileUploads: true, 
+            // 👆 THIS TURNS ON THE PAPERCLIP ICON 👆
+
             initialMessages: [
                 'Namaste! I am AgriBot. 🌾',
-                'Ask me about weather, crop diseases, or market prices.'
+                'Upload a photo of your plant or ask me a question
+            
             ],
             i18n: {
                 en: {
@@ -47,3 +51,4 @@
 </body>
 
 </html>
+
