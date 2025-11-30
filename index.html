@@ -185,6 +185,7 @@
         let mediaRecorder = null;
         let audioChunks = [];
         let isRecording = false;
+        let shouldSendAudio = false; // NEW FLAG to prevent double sends
         let recordingStartTime;
         let timerInterval;
         let audioContext;
@@ -318,7 +319,6 @@
             // 2. Prepare Data
             const formData = new FormData();
             formData.append('chatInput', text); 
-            // Removed session ID
             
             if (selectedImage) {
                 formData.append('files', selectedImage, selectedImage.name);
@@ -378,16 +378,21 @@
                 
                 mediaRecorder = new MediaRecorder(stream, options);
                 audioChunks = [];
+                shouldSendAudio = false; // Reset flag
 
                 mediaRecorder.ondataavailable = (e) => {
                     if (e.data.size > 0) audioChunks.push(e.data);
                 };
 
                 mediaRecorder.onstop = () => {
-                    const mimeType = mediaRecorder.mimeType || 'audio/webm';
-                    const blob = new Blob(audioChunks, { type: mimeType });
-                    sendAudioMessage(blob);
+                    // Only send if the flag is true
+                    if (shouldSendAudio) {
+                        const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                        const blob = new Blob(audioChunks, { type: mimeType });
+                        sendAudioMessage(blob);
+                    }
                     
+                    // Cleanup
                     stream.getTracks().forEach(track => track.stop());
                     if(audioContext) audioContext.close();
                 };
@@ -409,8 +414,10 @@
 
         function stopAndSendRecording() {
             if (mediaRecorder && isRecording) {
+                shouldSendAudio = true; // Set flag to allow sending
                 mediaRecorder.stop();
                 isRecording = false;
+                
                 cancelAnimationFrame(animationId);
                 stopTimer();
                 audioOverlay.classList.add('hidden');
@@ -420,11 +427,11 @@
 
         function cancelRecording() {
             if (mediaRecorder && isRecording) {
+                shouldSendAudio = false; // Set flag to PREVENT sending
                 mediaRecorder.stop();
                 isRecording = false;
                 
-                mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                if(audioContext) audioContext.close();
+                // Cleanup will happen in onstop, but it won't send
                 cancelAnimationFrame(animationId);
                 stopTimer();
                 
@@ -445,8 +452,8 @@
             else if (audioBlob.type.includes('ogg')) extension = 'ogg';
             else if (audioBlob.type.includes('wav')) extension = 'wav';
             
-            formData.append('file', audioBlob, `voice_message.${extension}`);
-            // Removed Session ID
+            // STATIC FILENAME: "audio_message"
+            formData.append('file', audioBlob, `audio_message.${extension}`);
 
             try {
                 const response = await fetch(AUDIO_WEBHOOK_URL, {
