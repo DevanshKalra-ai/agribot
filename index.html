@@ -7,14 +7,13 @@
     <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
     <link rel="stylesheet" href="style.css"> 
     <style>
-        /* Floating Mic Button Style */
         .mic-button {
             position: fixed;
             bottom: 30px;
             right: 30px;
             width: 60px;
             height: 60px;
-            background: #059669; /* Green */
+            background: #059669;
             border-radius: 50%;
             display: flex;
             justify-content: center;
@@ -24,20 +23,11 @@
             border: none;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             cursor: pointer;
-            z-index: 9999; /* On top of everything */
+            z-index: 9999;
             transition: all 0.2s;
         }
-
-        .mic-button:hover {
-            transform: scale(1.1);
-            background: #047857;
-        }
-
-        .mic-button.listening {
-            background: #dc2626; /* Red when recording */
-            animation: pulse 1.5s infinite;
-        }
-
+        .mic-button:hover { transform: scale(1.1); background: #047857; }
+        .mic-button.listening { background: #dc2626; animation: pulse 1.5s infinite; }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
             70% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
@@ -53,13 +43,11 @@
     </div>
 
     <div id="n8n-chat"></div>
-
     <button id="mic-btn" class="mic-button" title="Speak to AgriBot">🎤</button>
 
     <script type="module">
         import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
 
-        // 1. Initialize the Chat
         createChat({
             webhookUrl: 'https://devanshkalrad.app.n8n.cloud/webhook/6ace38a3-7145-4c3a-b230-007b16dc998d/chat', // <--- PASTE YOUR N8N URL HERE
             target: '#n8n-chat',
@@ -70,12 +58,7 @@
                 'Namaste! I am AgriBot. 🌾',
                 'Click the 🎤 button to speak to me!'
             ],
-            i18n: {
-                en: {
-                    title: 'AgriBot Chat',
-                    subtitle: 'AI-Powered Assistant'
-                }
-            },
+            i18n: { en: { title: 'AgriBot Chat', subtitle: 'AI-Powered Assistant' } },
             style: {
                 '--chat---color-primary': 'transparent',
                 '--chat---color-secondary': 'transparent',
@@ -83,36 +66,22 @@
             }
         });
 
-        // --- 2. ADDING SPEECH CAPABILITIES ---
-
-        // A. TEXT-TO-SPEECH (The Bot Speaks)
-        const synth = window.speechSynthesis;
+        // --- SPEECH LOGIC ---
         
-        // This watches the chat window for new messages
+        // 1. TEXT-TO-SPEECH (Bot Speaks)
+        const synth = window.speechSynthesis;
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 mutation.addedNodes.forEach((node) => {
-                    // Check if the new node is a bot message (chat-message-left)
-                    // Note: Class names might vary, so we check the structure
                     if (node.nodeType === 1 && node.innerText && !node.classList.contains('chat-message-right')) {
-                        
-                        // Small delay to ensure text is ready
                         setTimeout(() => {
-                            // Find the text content inside the message bubbles
-                            // We filter out "Time" or "Name" text if possible
                             const text = node.innerText; 
-                            
-                            // Speak it!
-                            if(text.length > 2) { // Avoid reading empty loading dots
+                            if(text.length > 2) { 
                                 const utterance = new SpeechSynthesisUtterance(text);
-                                utterance.rate = 1; // Normal speed
-                                utterance.pitch = 1;
-                                // Try to find a Hindi/Indian English voice if available
                                 const voices = synth.getVoices();
-                                const indianVoice = voices.find(v => v.lang.includes('IN'));
+                                const indianVoice = voices.find(v => v.lang.includes('IN')) || voices[0];
                                 if(indianVoice) utterance.voice = indianVoice;
-                                
-                                synth.cancel(); // Stop previous speech
+                                synth.cancel();
                                 synth.speak(utterance);
                             }
                         }, 500);
@@ -120,23 +89,18 @@
                 });
             });
         });
-
-        // Start watching the chat container after a short delay
         setTimeout(() => {
             const chatContainer = document.querySelector('#n8n-chat');
-            if(chatContainer) {
-                observer.observe(chatContainer, { childList: true, subtree: true });
-            }
+            if(chatContainer) observer.observe(chatContainer, { childList: true, subtree: true });
         }, 2000);
 
-
-        // B. SPEECH-TO-TEXT (You Speak)
+        // 2. SPEECH-TO-TEXT (You Speak)
         const micBtn = document.getElementById('mic-btn');
         
         if ('webkitSpeechRecognition' in window) {
             const recognition = new webkitSpeechRecognition();
             recognition.continuous = false;
-            recognition.lang = 'en-IN'; // Indian English
+            recognition.lang = 'en-IN'; 
             recognition.interimResults = false;
 
             micBtn.addEventListener('click', () => {
@@ -147,35 +111,43 @@
             recognition.onresult = (event) => {
                 micBtn.classList.remove('listening');
                 const transcript = event.results[0][0].transcript;
-                
-                // Find the input box inside the n8n widget
-                const chatInput = document.querySelector('textarea.chat-input') || document.querySelector('input.chat-input');
-                const sendBtn = document.querySelector('button[aria-label="Send message"]') || document.querySelector('.chat-input-send-button');
+                console.log("I heard:", transcript); // Debugging Log
 
-                if (chatInput) {
-                    // Type the text into the box
-                    chatInput.value = transcript;
-                    chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+                // --- AGGRESSIVE INPUT FINDER ---
+                // Try to find the textarea in the main DOM or Shadow DOM
+                const chatContainer = document.querySelector('#n8n-chat');
+                let inputField = chatContainer.querySelector('textarea') || chatContainer.querySelector('input[type="text"]');
+                
+                // If not found, check if it's hidden in a Shadow Root (rare but possible)
+                if (!inputField && chatContainer.shadowRoot) {
+                    inputField = chatContainer.shadowRoot.querySelector('textarea') || chatContainer.shadowRoot.querySelector('input');
+                }
+
+                if (inputField) {
+                    // Force the value in
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+                    nativeInputValueSetter.call(inputField, transcript);
                     
-                    // Optional: Auto-click send
-                    if(sendBtn) setTimeout(() => sendBtn.click(), 500);
+                    // Trigger events so n8n knows we typed
+                    inputField.dispatchEvent(new Event('input', { bubbles: true }));
+                    inputField.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    // Try to find and click the send button
+                    setTimeout(() => {
+                        const sendBtn = chatContainer.querySelector('button[class*="send"]') || chatContainer.querySelector('button svg')?.closest('button');
+                        if (sendBtn) sendBtn.click();
+                    }, 500);
+                } else {
+                    alert("Error: Could not find the chat box. Please type manually.");
+                    console.error("Could not find textarea inside #n8n-chat");
                 }
             };
 
-            recognition.onerror = () => {
-                micBtn.classList.remove('listening');
-            };
-            
-            recognition.onend = () => {
-                micBtn.classList.remove('listening');
-            };
+            recognition.onerror = () => micBtn.classList.remove('listening');
+            recognition.onend = () => micBtn.classList.remove('listening');
         } else {
-            micBtn.style.display = 'none'; // Hide if browser doesn't support it
-            console.log("Web Speech API not supported in this browser");
+            micBtn.style.display = 'none';
         }
     </script>
 </body>
 </html>
-
-
-
