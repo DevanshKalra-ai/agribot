@@ -366,13 +366,29 @@
         async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                
+                // Smart mimeType detection for Safari vs Chrome compatibility
+                let options = {};
+                if (MediaRecorder.isTypeSupported('audio/webm')) {
+                    options = { mimeType: 'audio/webm' };
+                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    options = { mimeType: 'audio/mp4' };
+                } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+                    options = { mimeType: 'audio/ogg' };
+                }
+                
+                // If no options set, browser uses default (which is usually safe but we check later)
+                mediaRecorder = new MediaRecorder(stream, options);
                 audioChunks = [];
 
-                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
 
                 mediaRecorder.onstop = () => {
-                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    // Use the actual mime type determined by the browser/recorder
+                    const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                    const blob = new Blob(audioChunks, { type: mimeType });
                     sendAudioMessage(blob);
                     
                     // Stop tracks
@@ -430,9 +446,16 @@
             loadingIndicator.classList.remove('hidden');
             scrollToBottom();
 
-            // 2. Send to Audio Webhook
+            // 2. Prepare Form Data with correct extension
             const formData = new FormData();
-            formData.append('file', audioBlob, 'voice_message.webm');
+            
+            // Determine extension based on blob type
+            let extension = 'webm';
+            if (audioBlob.type.includes('mp4')) extension = 'mp4';
+            else if (audioBlob.type.includes('ogg')) extension = 'ogg';
+            else if (audioBlob.type.includes('wav')) extension = 'wav';
+            
+            formData.append('file', audioBlob, `voice_message.${extension}`);
 
             try {
                 const response = await fetch(AUDIO_WEBHOOK_URL, {
@@ -440,7 +463,9 @@
                     body: formData
                 });
 
-                if (!response.ok) throw new Error('Audio upload failed');
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status} ${response.statusText}`);
+                }
 
                 // Handle Response (Assume text back from audio processing)
                 const contentType = response.headers.get("content-type");
@@ -459,7 +484,7 @@
             } catch (error) {
                 console.error("Audio Send Error", error);
                 loadingIndicator.classList.add('hidden');
-                appendMessage('bot', "Sorry, I couldn't process your audio message.");
+                appendMessage('bot', `⚠️ Error sending audio: ${error.message}`);
             }
         }
 
