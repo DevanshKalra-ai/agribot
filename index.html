@@ -185,7 +185,7 @@
         let mediaRecorder = null;
         let audioChunks = [];
         let isRecording = false;
-        let shouldSendAudio = false; // NEW FLAG to prevent double sends
+        let shouldSendAudio = false; 
         let recordingStartTime;
         let timerInterval;
         let audioContext;
@@ -341,14 +341,17 @@
 
                 if (!response.ok) throw new Error('Network response was not ok');
 
-                const contentType = response.headers.get("content-type");
-                let botResponse;
-
-                if (contentType && contentType.includes("application/json")) {
-                    const data = await response.json();
-                    botResponse = data.output || data.text || data.message || JSON.stringify(data);
-                } else {
-                    botResponse = await response.text();
+                // SMART PARSER
+                const rawText = await response.text();
+                let botResponse = rawText;
+                
+                try {
+                    // Check if the response is actually a JSON string disguised as text
+                    const data = JSON.parse(rawText);
+                    botResponse = data.output || data.text || data.message || data.content || rawText;
+                } catch (e) {
+                    // If parsing fails, it's just regular text, which is good
+                    botResponse = rawText;
                 }
                 
                 loadingIndicator.classList.add('hidden');
@@ -466,22 +469,15 @@
                     throw new Error(`Server returned ${response.status} ${response.statusText}`);
                 }
 
-                const contentType = response.headers.get("content-type");
-                let botResponse;
-
-                if (contentType && contentType.includes("application/json")) {
-                    const data = await response.json();
-                    
-                    const rawText = data.output || data.text || data.message || data.content;
-                    
-                    if (rawText) {
-                        botResponse = rawText;
-                    } else {
-                        console.warn("Received empty JSON response:", data);
-                        botResponse = "⚠️ The AI processed the audio but returned an empty response. Please check your n8n mappings.";
-                    }
-                } else {
-                    botResponse = await response.text();
+                // SMART PARSER FOR AUDIO RESPONSE TOO
+                const rawText = await response.text();
+                let botResponse = rawText;
+                
+                try {
+                    const data = JSON.parse(rawText);
+                    botResponse = data.output || data.text || data.message || data.content || rawText;
+                } catch (e) {
+                    botResponse = rawText;
                 }
 
                 if (!botResponse || botResponse.trim() === "") {
@@ -538,5 +534,3 @@
     </script>
 </body>
 </html>
-
-
