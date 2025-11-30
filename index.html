@@ -3,170 +3,502 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AgriBot | Smart Farming Assistant</title>
-    <link href="https://cdn.jsdelivr.net/npm/@n8n/chat/dist/style.css" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css"> 
+    <title>AI Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        /* Floating Mic Button Style */
-        .mic-button {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            width: 60px;
-            height: 60px;
-            background: #059669;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* Scrollbar styling */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Message Bubbles */
+        .msg-user {
+            background-color: #4f46e5;
             color: white;
-            font-size: 24px;
-            border: none;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            cursor: pointer;
-            z-index: 9999;
-            transition: all 0.2s;
+            border-bottom-right-radius: 4px;
+        }
+        .msg-bot {
+            background-color: white;
+            color: #1f2937;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
-        .mic-button:hover {
-            transform: scale(1.1);
-            background: #047857;
+        /* Audio Visualizer inside Input */
+        .visualizer-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 30px;
+            gap: 3px;
         }
 
-        .mic-button.listening {
-            background: #dc2626; /* Red when recording */
-            animation: pulse 1.5s infinite;
+        .bar {
+            width: 4px;
+            background: #ef4444; /* Red for recording */
+            border-radius: 9999px;
+            height: 4px;
+            transition: height 0.1s ease;
         }
 
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        /* Typing Indicator */
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background-color: #9ca3af;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out both;
         }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Markdown Styles for Bot Responses */
+        .prose p { margin-bottom: 0.5em; }
+        .prose p:last-child { margin-bottom: 0; }
+        .prose ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.5em; }
+        .prose ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.5em; }
+        .prose code { background: #f3f4f6; padding: 2px 4px; border-radius: 4px; font-size: 0.9em; font-family: monospace; }
+        .prose pre { background: #1f2937; color: #f3f4f6; padding: 1em; border-radius: 0.5em; overflow-x: auto; margin-bottom: 0.5em; }
     </style>
 </head>
-<body>
+<body class="h-screen flex flex-col max-w-2xl mx-auto bg-gray-50 shadow-2xl relative overflow-hidden">
 
-    <div class="header">
-        <h1>🌱 AgriBot</h1>
-        <p>Your AI Assistant for Crop & Weather Advice</p>
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white p-4 flex items-center shadow-md z-10 shrink-0">
+        <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center mr-3">
+            <i class="fas fa-robot text-xl"></i>
+        </div>
+        <div>
+            <h1 class="font-bold text-lg">AI Assistant</h1>
+            <div class="flex items-center text-xs text-indigo-200">
+                <span class="w-2 h-2 bg-green-400 rounded-full mr-1.5"></span>
+                Online
+            </div>
+        </div>
+    </header>
+
+    <!-- Chat History -->
+    <div id="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide bg-gray-50">
+        <!-- Welcome Message -->
+        <div class="flex justify-start">
+            <div class="msg-bot max-w-[85%] rounded-2xl p-4">
+                <p>Hello! I can help you with text, images, or audio. Send me a message or record your voice.</p>
+            </div>
+        </div>
+        <!-- Messages will be injected here -->
     </div>
 
-    <div id="n8n-chat"></div>
+    <!-- Loading Indicator (Hidden by default) -->
+    <div id="loadingIndicator" class="hidden px-4 pb-2 shrink-0">
+        <div class="flex justify-start">
+            <div class="bg-white rounded-2xl p-3 shadow-sm flex items-center gap-1">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+    </div>
 
-    <button id="mic-btn" class="mic-button" title="Speak to AgriBot">🎤</button>
-
-    <script type="module">
-        import { createChat } from 'https://cdn.jsdelivr.net/npm/@n8n/chat/dist/chat.bundle.es.js';
-
-        createChat({
-            webhookUrl: 'https://devanshkalrad.app.n8n.cloud/webhook/6ace38a3-7145-4c3a-b230-007b16dc998d/chat', // <--- PASTE YOUR N8N URL HERE
-            target: '#n8n-chat',
-            mode: 'fullscreen', 
-            showWelcomeScreen: true,
-            allowFileUploads: true, 
-            initialMessages: [
-                'Namaste! I am AgriBot. 🌾',
-                'Click the 🎤 button to speak to me!'
-            ],
-            i18n: {
-                en: {
-                    title: 'AgriBot Chat',
-                    subtitle: 'AI-Powered Assistant'
-                }
-            },
-            style: {
-                '--chat---color-primary': 'transparent',
-                '--chat---color-secondary': 'transparent',
-                '--chat---color-background': 'transparent'
-            }
-        });
-
-        // --- SPEECH LOGIC ---
+    <!-- Input Area -->
+    <div class="p-4 bg-white border-t border-gray-200 shrink-0 relative">
         
-        // 1. TEXT-TO-SPEECH (Bot Speaks)
-        const synth = window.speechSynthesis;
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === 1 && node.innerText && !node.classList.contains('chat-message-right')) {
-                        setTimeout(() => {
-                            const text = node.innerText; 
-                            if(text.length > 2) {
-                                const utterance = new SpeechSynthesisUtterance(text);
-                                const voices = synth.getVoices();
-                                const indianVoice = voices.find(v => v.lang.includes('IN'));
-                                if(indianVoice) utterance.voice = indianVoice;
-                                synth.cancel();
-                                synth.speak(utterance);
-                            }
-                        }, 500);
-                    }
-                });
-            });
-        });
-        setTimeout(() => {
-            const chatContainer = document.querySelector('#n8n-chat');
-            if(chatContainer) observer.observe(chatContainer, { childList: true, subtree: true });
-        }, 2000);
+        <!-- Image Preview Area -->
+        <div id="imagePreview" class="hidden mb-3 relative inline-block">
+            <img id="previewImg" src="" class="h-20 w-auto rounded-lg border border-gray-200 shadow-sm">
+            <button onclick="clearImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md hover:bg-red-600 transition">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
 
+        <!-- Audio Recording Overlay (Hidden by default) -->
+        <div id="audioOverlay" class="hidden absolute inset-0 bg-white z-20 items-center justify-between px-4 border-t border-gray-200">
+            <div class="flex items-center gap-3 flex-1">
+                <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                <span id="recordingTimer" class="font-mono text-gray-700 font-medium">00:00</span>
+                <!-- Mini Visualizer -->
+                <div id="miniVisualizer" class="visualizer-container flex-1 max-w-[150px]">
+                    <!-- Bars injected by JS -->
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="cancelRecording()" class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition" title="Cancel">
+                    <i class="fas fa-trash"></i>
+                </button>
+                <button onclick="stopAndSendRecording()" class="w-10 h-10 bg-indigo-600 text-white rounded-full flex items-center justify-center hover:bg-indigo-700 shadow-md transition" title="Send Audio">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
 
-        // 2. SPEECH-TO-TEXT (You Speak)
-        const micBtn = document.getElementById('mic-btn');
-        
-        if ('webkitSpeechRecognition' in window) {
-            const recognition = new webkitSpeechRecognition();
-            recognition.continuous = false;
-            recognition.lang = 'en-IN'; 
-            recognition.interimResults = false;
-
-            micBtn.addEventListener('click', () => {
-                recognition.start();
-                micBtn.classList.add('listening');
-            });
-
-            recognition.onresult = (event) => {
-                micBtn.classList.remove('listening');
-                const transcript = event.results[0][0].transcript;
-                console.log("You said:", transcript); // Debugging line
-
-                // --- SMART FINDER LOGIC ---
-                // We try multiple ways to find the input box inside the n8n widget
-                const chatInput = document.querySelector('textarea') || 
-                                  document.querySelector('input[type="text"]');
-                
-                if (chatInput) {
-                    // Force the value into the box
-                    chatInput.value = transcript;
-                    chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    chatInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-                    // Try to find the send button and click it
-                    setTimeout(() => {
-                        const sendBtn = document.querySelector('button[class*="chat-input-send"]') || 
-                                        document.querySelector('button[aria-label="Send message"]');
-                        if (sendBtn) {
-                            sendBtn.click();
-                        } else {
-                            // If button not found, try hitting "Enter" key programmatically
-                            chatInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-                        }
-                    }, 200);
-                } else {
-                    alert("Error: Could not find the chat box. Please type manually.");
-                }
-            };
-
-            recognition.onerror = (e) => {
-                micBtn.classList.remove('listening');
-                console.error("Speech error:", e);
-            };
+        <!-- Standard Input Controls -->
+        <div class="flex items-end gap-2">
+            <!-- File Input (Hidden) -->
+            <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelect(this)">
             
-            recognition.onend = () => {
-                micBtn.classList.remove('listening');
+            <button onclick="document.getElementById('fileInput').click()" class="p-3 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition h-12 w-12 flex items-center justify-center shrink-0">
+                <i class="fas fa-paperclip text-lg"></i>
+            </button>
+            
+            <div class="flex-1 bg-gray-100 rounded-2xl flex items-center px-4 py-2 min-h-[48px]">
+                <textarea id="messageInput" rows="1" class="w-full bg-transparent border-none focus:ring-0 text-gray-700 placeholder-gray-400 resize-none max-h-32 py-1" placeholder="Type a message..." oninput="autoResize(this)" onkeydown="handleEnter(event)"></textarea>
+            </div>
+            
+            <div id="sendControls" class="flex shrink-0">
+                <!-- Microphone Button (Visible when input is empty) -->
+                <button id="micBtn" onclick="startRecording()" class="bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-500 rounded-full w-12 h-12 flex items-center justify-center transition shadow-sm">
+                    <i class="fas fa-microphone text-lg"></i>
+                </button>
+
+                <!-- Send Button (Visible when input has text) -->
+                <button id="sendBtn" onclick="sendTextMessage()" class="hidden bg-indigo-600 text-white hover:bg-indigo-700 rounded-full w-12 h-12 flex items-center justify-center transition shadow-md">
+                    <i class="fas fa-arrow-up text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const CHAT_WEBHOOK_URL = "https://devanshkalrad.app.n8n.cloud/webhook/6ace38a3-7145-4c3a-b230-007b16dc998d/chat";
+        const AUDIO_WEBHOOK_URL = "https://devanshkalrad.app.n8n.cloud/webhook-test/audio-in";
+
+        // --- STATE ---
+        let selectedImage = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let recordingStartTime;
+        let timerInterval;
+        let audioContext;
+        let analyser;
+        let animationId;
+
+        // --- DOM ELEMENTS ---
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const micBtn = document.getElementById('micBtn');
+        const chatContainer = document.getElementById('chatContainer');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImg = document.getElementById('previewImg');
+        const audioOverlay = document.getElementById('audioOverlay');
+        const recordingTimer = document.getElementById('recordingTimer');
+        const miniVisualizer = document.getElementById('miniVisualizer');
+
+        // Initialize Visualizer Bars
+        for (let i = 0; i < 10; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'bar';
+            miniVisualizer.appendChild(bar);
+        }
+        const bars = document.querySelectorAll('.bar');
+
+        // --- UI LOGIC ---
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+            toggleSendButton();
+        }
+
+        function toggleSendButton() {
+            const hasText = messageInput.value.trim().length > 0;
+            const hasImage = selectedImage !== null;
+            
+            if (hasText || hasImage) {
+                micBtn.classList.add('hidden');
+                sendBtn.classList.remove('hidden');
+                sendBtn.classList.add('flex');
+            } else {
+                micBtn.classList.remove('hidden');
+                sendBtn.classList.add('hidden');
+                sendBtn.classList.remove('flex');
+            }
+        }
+
+        function handleFileSelect(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    selectedImage = file;
+                    previewImg.src = e.target.result;
+                    imagePreview.classList.remove('hidden');
+                    toggleSendButton();
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function clearImage() {
+            selectedImage = null;
+            document.getElementById('fileInput').value = '';
+            imagePreview.classList.add('hidden');
+            toggleSendButton();
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendTextMessage();
+            }
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // --- MESSAGING LOGIC ---
+
+        function appendMessage(role, text, attachmentUrl = null, isAudio = false) {
+            const div = document.createElement('div');
+            div.className = `flex w-full ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            let contentHtml = '';
+            
+            // Render attachment (Image)
+            if (attachmentUrl && !isAudio) {
+                contentHtml += `<img src="${attachmentUrl}" class="rounded-lg max-w-full mb-2 border border-black/10" style="max-height: 200px;">`;
+            }
+
+            // Render Text (Markdown supported for bot)
+            if (text) {
+                if (role === 'bot') {
+                    // Safe Markdown parsing
+                    contentHtml += `<div class="prose prose-sm max-w-none text-gray-800 leading-relaxed">${marked.parse(text)}</div>`;
+                } else {
+                    contentHtml += `<p class="whitespace-pre-wrap">${text}</p>`;
+                }
+            }
+
+            // Render Audio Placeholder
+            if (isAudio && role === 'user') {
+                 contentHtml += `<div class="flex items-center gap-2 text-sm"><i class="fas fa-microphone"></i> Audio message sent</div>`;
+            }
+
+            div.innerHTML = `
+                <div class="${role === 'user' ? 'msg-user' : 'msg-bot'} max-w-[85%] rounded-2xl p-4 shadow-sm animate-fade-in">
+                    ${contentHtml}
+                </div>
+            `;
+            
+            chatContainer.appendChild(div);
+            scrollToBottom();
+        }
+
+        async function sendTextMessage() {
+            const text = messageInput.value.trim();
+            if (!text && !selectedImage) return;
+
+            // 1. Add User Message to UI
+            let imageUrl = null;
+            if (selectedImage) {
+                imageUrl = URL.createObjectURL(selectedImage);
+            }
+            appendMessage('user', text, imageUrl);
+
+            // 2. Prepare Data
+            const formData = new FormData();
+            formData.append('chatInput', text); // Standard n8n chat input
+            if (selectedImage) {
+                formData.append('files', selectedImage, selectedImage.name); // Attach file
+            }
+
+            // 3. Clear Input
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            clearImage();
+            toggleSendButton();
+            loadingIndicator.classList.remove('hidden');
+            scrollToBottom();
+
+            // 4. Send to Webhook
+            try {
+                const response = await fetch(CHAT_WEBHOOK_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                // Try to parse JSON first, else text
+                const contentType = response.headers.get("content-type");
+                let botResponse;
+
+                if (contentType && contentType.includes("application/json")) {
+                    const data = await response.json();
+                    // n8n output usually in 'output' or 'text' or just the object
+                    botResponse = data.output || data.text || data.message || JSON.stringify(data);
+                } else {
+                    botResponse = await response.text();
+                }
+                
+                loadingIndicator.classList.add('hidden');
+                appendMessage('bot', botResponse);
+
+            } catch (error) {
+                console.error('Error:', error);
+                loadingIndicator.classList.add('hidden');
+                appendMessage('bot', "Sorry, I couldn't reach the server. Please try again.");
+            }
+        }
+
+        // --- AUDIO RECORDING LOGIC ---
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    sendAudioMessage(blob);
+                    
+                    // Stop tracks
+                    stream.getTracks().forEach(track => track.stop());
+                    if(audioContext) audioContext.close();
+                };
+
+                // UI Updates
+                audioOverlay.classList.remove('hidden');
+                audioOverlay.classList.add('flex');
+                startTimer();
+                startVisualizer(stream);
+                
+                mediaRecorder.start();
+                isRecording = true;
+
+            } catch (err) {
+                console.error("Mic Error:", err);
+                alert("Could not access microphone.");
+            }
+        }
+
+        function stopAndSendRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                cancelAnimationFrame(animationId);
+                stopTimer();
+                audioOverlay.classList.add('hidden');
+                audioOverlay.classList.remove('flex');
+            }
+        }
+
+        function cancelRecording() {
+            if (mediaRecorder && isRecording) {
+                // Stop but don't send (overwrite onstop temporarily)
+                mediaRecorder.onstop = null;
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                // Cleanup
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                if(audioContext) audioContext.close();
+                cancelAnimationFrame(animationId);
+                stopTimer();
+                
+                audioOverlay.classList.add('hidden');
+                audioOverlay.classList.remove('flex');
+            }
+        }
+
+        async function sendAudioMessage(audioBlob) {
+            // 1. Show user audio bubble
+            appendMessage('user', '', null, true);
+            loadingIndicator.classList.remove('hidden');
+            scrollToBottom();
+
+            // 2. Send to Audio Webhook
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'voice_message.webm');
+
+            try {
+                const response = await fetch(AUDIO_WEBHOOK_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Audio upload failed');
+
+                // Handle Response (Assume text back from audio processing)
+                const contentType = response.headers.get("content-type");
+                let botResponse;
+
+                if (contentType && contentType.includes("application/json")) {
+                    const data = await response.json();
+                    botResponse = data.output || data.text || JSON.stringify(data);
+                } else {
+                    botResponse = await response.text();
+                }
+
+                loadingIndicator.classList.add('hidden');
+                appendMessage('bot', botResponse);
+
+            } catch (error) {
+                console.error("Audio Send Error", error);
+                loadingIndicator.classList.add('hidden');
+                appendMessage('bot', "Sorry, I couldn't process your audio message.");
+            }
+        }
+
+        // --- TIMERS & VISUALIZER ---
+
+        function startTimer() {
+            recordingStartTime = Date.now();
+            recordingTimer.innerText = "00:00";
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const secs = (elapsed % 60).toString().padStart(2, '0');
+                recordingTimer.innerText = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function startVisualizer(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            analyser.fftSize = 32;
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            const animate = () => {
+                analyser.getByteFrequencyData(dataArray);
+                for (let i = 0; i < 10; i++) {
+                    const value = dataArray[i];
+                    const height = Math.max(4, (value / 255) * 20);
+                    bars[i].style.height = `${height}px`;
+                }
+                animationId = requestAnimationFrame(animate);
             };
-        } else {
-            micBtn.style.display = 'none';
+            animate();
         }
     </script>
 </body>
